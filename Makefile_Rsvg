@@ -2,19 +2,19 @@ LIBPNG_VERSION ?= 1.6.37
 UTIL_LINUX_VERSION ?= 2.33
 LIBJPEG_VERSION ?= 9c
 OPENJP2_VERSION ?= 2.3.1
-LIBTIFF_VERSION ?= 4.0.9
+LIBTIFF_VERSION ?= 4.0.10
 LIBXML2_VERSION ?= 2.9.9
-GLIB_VERSION ?= 2.58.3
-CAIRO_VERSION ?= 1.14.8
-LIBCROCO_VERSION ?= 0.6.8
-PANGO_VERSION ?= 1.28.4
-GDK_PIXBUF_VERSION ?= 2.28.2
+GLIB_VERSION ?= 2.61.1
+CAIRO_VERSION ?= 1.16.0
+LIBCROCO_VERSION ?= 0.6.13
+PANGO_VERSION ?= 1.43.0
+GDK_PIXBUF_VERSION ?= 2.38.1
 LIBFFI_VERSION ?= 3.2.1
-LIBRSVG_VERSION ?= 2.26.3
+LIBRSVG_VERSION ?= 2.45.6
 PIXMAN_VERSION ?= 0.38.4
 FONTCONFIG_VERSION ?= 2.13.0
 FREETYPE_VERSION ?= 2.10.0
-BZIP2_VERSION ?= 1.0.6
+# BZIP2_VERSION ?= 1.0.6
 HARFBUZZ_VERSION ?= 2.4.0
 
 #fontconfig-2.10.95-11.amzn2.0.2.x86_64.rpm
@@ -41,24 +41,35 @@ CACHE_DIR=$(PROJECT_ROOT)build/cache
 
 .ONESHELL:
 
-CMAKE=cmake3
-PKG_CONFIG=PKG_CONFIG_PATH=$(CACHE_DIR)/lib/pkgconfig
+CMAKE=cmake
+PKG_CONFIG=PKG_CONFIG_PATH=$(CACHE_DIR)/lib64/pkgconfig:$(CACHE_DIR)/lib/pkgconfig:$(TARGET_DIR)lib64/pkgconfig:$(TARGET_DIR)lib/pkgconfig
+LOCAL_PATH=PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:$(CACHE_DIR)/bin:/var/lang/bin:${PATH}"
 CONFIGURE = ./configure \
 		CPPFLAGS=-I$(CACHE_DIR)/include \
 		LDFLAGS="-L$(CACHE_DIR)/lib -L$(CACHE_DIR)/lib64" \
 		$(PKG_CONFIG) \
 		--disable-dependency-tracking \
-		--disable-shared \
-		--enable-static \
 		--disable-rpath \
 		--prefix=$(CACHE_DIR)
 
 ## dev tool istallation
 
 init:
-	yum install -y gcc gcc-c++ cmake3 intltool flex bison shared-mime-info gperf 
+	export $(LOCAL_PATH)
+	yum install -y gcc gcc-c++ intltool flex bison shared-mime-info gperf \
+		ninja-build libmount-devel gobject-introspection-devel fribidi-devel gtk3-devel
+	yum remove -y cmake
+	pip3 install --user meson
+	curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 ## util-linux has libmount and libuuid etc
+
+$(CMAKE3_SOURCE):
+	curl -LO https://github.com/Kitware/CMake/releases/download/v3.15.0-rc1/cmake-3.15.0-rc1-Linux-x86_64.sh
+	
+$(CMAKE3): $(CMAKE3_SOURCE)
+	sh cmake-3.15.0-rc1-Linux-x86_64.sh --skip-license --prefix=$(PROJECT_ROOT)build/cache
+	sh cmake-3.15.0-rc1-Linux-x86_64.sh --skip-license
 
 LIBUUID=$(CACHE_DIR)/lib/libuuid.a
 
@@ -104,18 +115,25 @@ $(GLIB_SOURCE):
 $(GLIB): $(GLIB_SOURCE) $(LIBFFI)
 	tar xf $<
 	cd glib*
-	$(PKG_CONFIG) ./autogen.sh 
-	$(CONFIGURE) \
-		--disable-gtk-doc \
-		--disable-man \
-		--disable-libmount \
-		--disable-fam \
-		--disable-libelf \
-		--disable-xattr \
-		--disable-installed-tests \
-		--with-pcre=internal
-	make
-	make install
+
+	export $(LOCAL_PATH)
+	$(PKG_CONFIG) meson --prefix $(CACHE_DIR) _build -Dman=false -Dinternal_pcre=true -Dlibmount=false -Dxattr=false
+	$(PKG_CONFIG) ninja-build -v -C _build
+	$(PKG_CONFIG) ninja-build -C _build install
+
+# $(PKG_CONFIG) ./autogen.sh 
+# $(CONFIGURE) \
+	--enable-shared \
+	--disable-gtk-doc \
+	--disable-man \
+	--disable-libmount \
+	--disable-fam \
+	--disable-libelf \
+	--disable-xattr \
+	--disable-installed-tests \
+	--with-pcre=internal
+# make
+# make install
 
 ## libxml2
 
@@ -184,17 +202,18 @@ $(LIBPNG): $(LIBPNG_SOURCE)
 
 # libbz2
 
-BZIP2_SOURCE=bzip2-$(BZIP2_VERSION).tar.gz
-LIBBZ2=$(CACHE_DIR)/lib/libbz2.a
+# BZIP2_SOURCE=bzip2-$(BZIP2_VERSION).tar.gz
+# LIBBZ2=$(CACHE_DIR)/lib/libbz2.a
 
-$(BZIP2_SOURCE):
-	curl -LO http://prdownloads.sourceforge.net/bzip2/bzip2-$(BZIP2_VERSION).tar.gz
+# $(BZIP2_SOURCE):
+# 	curl -LO http://prdownloads.sourceforge.net/bzip2/bzip2-$(BZIP2_VERSION).tar.gz
 
-$(LIBBZ2): $(BZIP2_SOURCE)
-	tar xf $<
-	cd bzip2-*
-	make libbz2.a
-	make install PREFIX=$(CACHE_DIR)
+# $(LIBBZ2): $(BZIP2_SOURCE)
+# 	tar xf $<
+# 	cd bzip2-*
+# 	cmake . -DCMAKE_LIBRARY_PATH=/usr/lib/
+# 	make libbz2.a
+# 	make install PREFIX=$(CACHE_DIR)
 
 # libtiff
 
@@ -225,18 +244,21 @@ $(OPENJP2_SOURCE):
 
 LIBOPENJP2=$(CACHE_DIR)/lib/libopenjp2.a
 
-$(LIBOPENJP2): $(OPENJP2_SOURCE) $(LIBPNG) $(LIBTIFF)
+$(LIBOPENJP2): $(OPENJP2_SOURCE) $(LIBPNG) $(LIBTIFF) $(CMAKE3)
 	tar xf $<
 	cd openjpeg-*
 	mkdir -p build
 	cd build 
+	export $(LOCAL_PATH)
 	$(PKG_CONFIG) $(CMAKE) .. \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX=$(CACHE_DIR) \
-		-DBUILD_SHARED_LIBS:bool=off \
 		-DBUILD_CODEC:bool=off
 	make
 	make install
+
+## Shared?
+# -DBUILD_SHARED_LIBS:bool=on
 
 ## pixman
 
@@ -289,13 +311,12 @@ $(LIBHARFBUZZ): $(HARFBUZZ_SOURCE) $(FT_WITHOUT_HB)
 	make
 	make install
 
-$(LIBFREETYPE): $(FREETYPE_SOURCE) $(GLIB) $(LIBPNG) $(LIBBZ2) $(LIBHARFBUZZ)
+$(LIBFREETYPE): $(FREETYPE_SOURCE) $(GLIB) $(LIBPNG) $(LIBHARFBUZZ)
 	tar xf $<
 	cd freetype-$(FREETYPE_VERSION)
 	$(CONFIGURE) \
 		--with-harfbuzz \
-		--with-png \
-		--with-bzip2
+		--with-png
 	make distclean clean
 	make
 	make install
@@ -328,6 +349,8 @@ cairo $(LIBCAIRO): $(CAIRO_SOURCE) $(LIBPNG) $(LIBXML2) $(LIBFONTCONFIG) $(LIBPI
 	tar xf $<
 	cd cairo*
 	$(CONFIGURE) \
+		--with-glib \
+		--enable-shared \
 		--disable-gtk-doc \
 		--disable-gtk-doc-html \
 		--disable-valgrind \
@@ -344,7 +367,7 @@ cairo $(LIBCAIRO): $(CAIRO_SOURCE) $(LIBPNG) $(LIBXML2) $(LIBFONTCONFIG) $(LIBPI
 		--enable-pdf \
 		--enable-svg \
 		--disable-test-surfaces \
-		--disable-gobject \
+		--enable-gobject \
 		--without-x \
 		--disable-interpreter \
 		--disable-full-testing \
@@ -360,7 +383,7 @@ cairo $(LIBCAIRO): $(CAIRO_SOURCE) $(LIBPNG) $(LIBXML2) $(LIBFONTCONFIG) $(LIBPI
 
 ## pango
 
-PANGO_SOURCE=pango-$(PANGO_VERSION).tar.bz2
+PANGO_SOURCE=pango-$(PANGO_VERSION).tar.xz
 PANGO_MINOR_VERSION=$(basename $(PANGO_VERSION))
 PANGO_MAJOR_VERSION=$(basename $(PANGO_MINOR_VERSION))
 LIBPANGO:=$(CACHE_DIR)/lib/libpango-$(PANGO_MAJOR_VERSION).0.a
@@ -368,18 +391,24 @@ LIBPANGO:=$(CACHE_DIR)/lib/libpango-$(PANGO_MAJOR_VERSION).0.a
 $(PANGO_SOURCE):
 	curl -OL http://ftp.gnome.org/pub/GNOME/sources/pango/$(PANGO_MINOR_VERSION)/$(PANGO_SOURCE)
 
-$(LIBPANGO): $(PANGO_SOURCE) $(LIBCROCO) $(LIBCAIRO)
+$(LIBPANGO): $(PANGO_SOURCE) $(LIBCROCO) $(LIBCAIRO) $(CMAKE3)
 	tar xf $<
 	cd pango*
-	$(CONFIGURE) \
-		--with-included-modules	\
-		--disable-introspection \
-		--disable-gtk-doc \
-		--disable-gtk-doc-html \
-		--disable-doc-cross-references \
-		--without-x
-	make
-	make install
+
+	export $(LOCAL_PATH)
+	$(PKG_CONFIG) meson --prefix $(CACHE_DIR) _build -Dgir=true
+	$(PKG_CONFIG) ninja-build -C _build
+	$(PKG_CONFIG) ninja-build -C _build install
+
+# $(CONFIGURE) \
+# 	--with-included-modules	\
+# 	--disable-introspection \
+# 	--disable-gtk-doc \
+# 	--disable-gtk-doc-html \
+# 	--disable-doc-cross-references \
+# 	--without-x
+# make
+# make install
 
 
 ### GDK_PIXBUF
@@ -397,26 +426,34 @@ $(GDK_PIXBUF_SOURCE):
 $(LIBGDK_PIXBUF): $(GDK_PIXBUF_SOURCE) $(LIBPNG) $(LIBOPENJP2) $(LIBJPEG) $(LIBTIFF) $(GLIB)
 	tar xf $<
 	cd gdk-pixbuf*
-	$(CONFIGURE) \
-		--without-gdiplus \
-		--disable-modules \
-		--disable-glibtest \
-		--disable-introspection \
-		--disable-gtk-doc-html \
-		--with-included-loaders=yes \
-		--disable-gio-sniffing \
-		--disable-rpath \
-		--disable-gtk-doc \
-		--without-x11
-	make
-	make install
+
+	export $(LOCAL_PATH)
+	$(PKG_CONFIG) meson --prefix $(CACHE_DIR) _build -Dgir=true -Dx11=false \
+		-Drelocatable=true -Dgio_sniffing=false -Dbuiltin_loaders=true -Dinstalled_tests=false 
+	$(PKG_CONFIG) ninja-build -C _build
+	$(PKG_CONFIG) ninja-build -C _build install
+
+	# $(CONFIGURE) \
+	# 	--enable-shared \
+	# 	--without-gdiplus \
+	# 	--disable-modules \
+	# 	--disable-glibtest \
+	# 	--disable-introspection \
+	# 	--disable-gtk-doc-html \
+	# 	--with-included-loaders=yes \
+	# 	--disable-gio-sniffing \
+	# 	--disable-rpath \
+	# 	--disable-gtk-doc \
+	# 	--without-x11
+	# make
+	# make install
 
 
 ## RSVG
 
 LIBS:=$(LIBCROCO) $(LIBPANGO) $(LIBCAIRO) $(LIBGDK_PIXBUF)
 
-LIBRSVG_SOURCE=librsvg-$(LIBRSVG_VERSION).tar.gz
+LIBRSVG_SOURCE=librsvg-$(LIBRSVG_VERSION).tar.xz
 LIBRSVG_MINOR_VERSION=$(basename $(LIBRSVG_VERSION))
 LIBRSVG_MAJOR_VERSION=$(basename $(LIBRSVG_MINOR_VERSION))
 
@@ -426,12 +463,14 @@ $(LIBRSVG_SOURCE):
 rsvg $(TARGET_DIR)bin/rsvg-convert: $(LIBRSVG_SOURCE) $(LIBS)
 	tar xf $<
 	cd librsvg-*
+	export $(LOCAL_PATH)
+	
 	$(PKG_CONFIG) ./configure \
 		CPPFLAGS=-I$(CACHE_DIR)/include \
 		LDFLAGS=-L$(CACHE_DIR)/lib \
+		--enable-shared \
 		--enable-option-checking \
 		--disable-dependency-tracking \
-		--disable-shared \
 		--enable-static \
 		--disable-pixbuf-loader \
 		--disable-gtk-theme \
@@ -441,6 +480,10 @@ rsvg $(TARGET_DIR)bin/rsvg-convert: $(LIBRSVG_SOURCE) $(LIBS)
 	make all
 	make install
 
+	npm install node-pre-gyp librsvg-prebuilt --prefix $(TARGET_DIR)nodejs --no-package-lock
+	cd $(TARGET_DIR)nodejs/node_modules/librsvg-prebuilt
+	$(PKG_CONFIG) $(TARGET_DIR)nodejs/node_modules/librsvg-prebuilt/node_modules/.bin/node-pre-gyp rebuild
+
 libs: $(LIBS)
 
-all: $(TARGET_DIR)bin/rsvg-convert
+all: $(TARGET_DIR)bin/rsvg-convert 

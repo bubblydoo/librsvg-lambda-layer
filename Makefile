@@ -1,6 +1,6 @@
 PROJECT_ROOT = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-DOCKER_IMAGE ?= lambci/lambda-base-2:build
+DOCKER_IMAGE ?= lambci/lambda:build-nodejs10.x
 TARGET ?=/opt/
 
 MOUNTS = -v $(PROJECT_ROOT):/var/task \
@@ -16,9 +16,8 @@ clean:
 bash:
 	$(DOCKER) $(MOUNTS) --entrypoint /bin/bash -t $(DOCKER_IMAGE)
 
-all libs: 
+all libs:
 	$(DOCKER) $(MOUNTS) --entrypoint /usr/bin/make -t $(DOCKER_IMAGE) TARGET_DIR=$(TARGET) -f ../Makefile_Rsvg init $@
-
 
 STACK_NAME ?= rsvg-layer 
 
