@@ -3,8 +3,7 @@ PROJECT_ROOT = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 DOCKER_IMAGE ?= lambci/lambda:build-nodejs10.x
 TARGET ?=/opt/
 
-MOUNTS = -v $(PROJECT_ROOT):/var/task \
-	-v $(PROJECT_ROOT)result:$(TARGET)
+MOUNTS = -v $(PROJECT_ROOT)result:$(TARGET)
 
 DOCKER = docker run -it --rm -w=/var/task/build
 build result: 
@@ -24,6 +23,7 @@ STACK_NAME ?= rsvg-layer
 result/bin/rsvg: all
 
 build/output.yaml: template.yaml 
+	mkdir build
 	aws cloudformation package --template $< --s3-bucket $(DEPLOYMENT_BUCKET) --output-template-file $@
 
 deploy: build/output.yaml
