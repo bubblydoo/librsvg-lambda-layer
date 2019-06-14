@@ -1,29 +1,27 @@
-FROM lambci/lambda:build-nodejs10.x
+FROM lambci/lambda:build-nodejs10.x AS builder
 
 ENV PROJECT_ROOT=/var/task \
     CACHE_DIR=/var/task/build/cache \
     TARGET_DIR=/opt
 
-ENV PKG_CONFIG_PATH="${CACHE_DIR}/lib64/pkgconfig:${CACHE_DIR}/lib/pkgconfig:${TARGET_DIR}/lib64/pkgconfig:${TARGET_DIR}/lib/pkgconfig" \
+ENV PKG_CONFIG_PATH="${CACHE_DIR}/lib64/pkgconfig:${CACHE_DIR}/lib/pkgconfig" \
     PATH="/root/.local/bin:/root/.cargo/bin:${CACHE_DIR}/bin:/var/lang/bin:${PATH}" \
-    CPPFLAGS="-I${CACHE_DIR}/include -fPIC -static" \
+    CPPFLAGS="-I${CACHE_DIR}/include -fPIC" \
     LDFLAGS="-L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64 -static" \
-    LIBS="-static" \
     CC=clang \
     TERM=xterm-256color
 
 WORKDIR /var/task/build
 
 RUN yum install -y gcc gcc-c++ intltool flex bison shared-mime-info gperf \
-		ninja-build libmount-devel gobject-introspection-devel fribidi-devel \
-        libuuid-devel libxml2-devel libcroco-devel libjpeg-devel \
-        libpng-devel libtiff-devel fontconfig-devel pango-devel \
-        bzip2-static glibc-static && \
+		ninja-build \
+        glibc-static && \
 	yum remove -y cmake && \
 	pip3 install --user meson && \
 	curl https://sh.rustup.rs -sSf | sh -s -- -y
 
-RUN mkdir -p ${CACHE_DIR} && mkdir -p ${TARGET_DIR}
+RUN mkdir -p ${CACHE_DIR} && mkdir -p ${TARGET_DIR} && \
+    export MAKEFLAGS="-j -l $(grep -c ^processor /proc/cpuinfo)"
 
 ENV CMAKE_VERSION=3.15.0-rc1 \
     GLIB_VERSION=2.61.1 \
@@ -32,8 +30,8 @@ ENV CMAKE_VERSION=3.15.0-rc1 \
     HARFBUZZ_VERSION=2.5.0 \
     PIXMAN_VERSION=0.38.4 \
     CAIRO_VERSION=1.17.2 \
-    LIBRSVG_VERSION=2.45.6 \
-    LIBRSVG_MINOR_VERSION=2.45 \
+    LIBRSVG_VERSION=2.40.16 \
+    LIBRSVG_MINOR_VERSION=2.40 \
     GDK_PIXBUF_VERSION=2.38.1 \
     GDK_PIXBUF_MINOR_VERSION=2.38 \
     LIBFFI_VERSION=3.2.1 \
@@ -122,8 +120,6 @@ RUN tar xf ${UTIL_LINUX_SOURCE} && \
 	make && \
 	make install
 
-# Also install util linux here as "-luuid" doesnt work
-
 # ENV LD_LIBRARY_PATH="/usr/lib64:/usr/lib:/lib"
 # ENV CPPFLAGS="-I/usr/lib64/include -I/usr/lib/include -I${CACHE_DIR}/include -fPIC -static" \
 #     LDFLAGS="-I/usr/lib64 -I/usr/lib -L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64 -static" 
@@ -139,9 +135,7 @@ RUN tar xf ${UTIL_LINUX_SOURCE} && \
 #     make && \
 #     make install
 
-ENV CPPFLAGS="-I${CACHE_DIR}/include -fPIC" \
-    LDFLAGS="-L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64" \
-    LIBS=""
+ENV LDFLAGS="-L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64"
 
 RUN tar xf ${LIBPNG_SOURCE} && \
     cd libpng-* && \
@@ -149,21 +143,16 @@ RUN tar xf ${LIBPNG_SOURCE} && \
     make && \
     make install
 
-# RUN curl -LOf https://sourceware.org/elfutils/ftp/elfutils-latest.tar.bz2
-
-# RUN tar xf elfutils-latest.tar.bz2 && \
-#     cd elfutils-* && \
-#     CC=gcc ./configure --prefix=${CACHE_DIR} --with-zlib --disable-dependency-tracking && \
-#     make && \
-#     make install
-
-# ENV CPPFLAGS="-I${CACHE_DIR}/include -fPIC" \
-#     LDFLAGS="-L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64" \
-#     LIBS=""
-
-# RUN CPPFLAGS="-I${CACHE_DIR}/include -fPIC -static" \
-#     LDFLAGS="-L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64 -static" \
-#     LIBS="-static"
+RUN tar xf ${LIBTIFF_SOURCE} && \
+    cd tiff-* && \
+    ./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
+		--disable-jpeg \
+		--disable-old-jpeg \
+		--disable-lzma \
+		--disable-jpeg12 \
+		--without-x && \
+	make && \
+	make install
 
 RUN tar xf ${GLIB_SOURCE} && \
     cd glib-* && \
@@ -172,18 +161,20 @@ RUN tar xf ${GLIB_SOURCE} && \
     ninja-build -v -C _build && \
     ninja-build -C _build install
 
-# RUN CPPFLAGS="-I${CACHE_DIR}/include -fPIC -static" \
-#     LDFLAGS="-L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64 -static" \
-#     LIBS="-static"
-
-# build libtiff here, before gdk pixbuf
-    
 RUN tar xf ${GDK_PIXBUF_SOURCE} && \
     cd gdk-pixbuf-* && \
     meson --prefix ${CACHE_DIR} _build -Dgir=false -Dx11=false -Ddefault_library=static \
-        -Drelocatable=true -Dgio_sniffing=false -Dbuiltin_loaders=true -Dinstalled_tests=false && \
+        -Drelocatable=true -Dgio_sniffing=false -Dbuiltin_loaders=none -Dinstalled_tests=false && \
     ninja-build -C _build && \
     ninja-build -C _build install
+
+RUN tar xf ${LIBXML2_SOURCE} && \
+	cd libxml2-* && \
+    ./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
+		--without-history \
+		--without-python && \
+	make && \
+	make install
 
 ENV FREETYPE_WITHOUT_HB_DIR=${PROJECT_ROOT}/build/freetype-${FREETYPE_VERSION}-without-harfbuzz
 
@@ -193,13 +184,20 @@ RUN tar xf ${FREETYPE_SOURCE} -C /tmp && \
 	cd ${FREETYPE_WITHOUT_HB_DIR} && \
     ./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
         --without-harfbuzz && \
+	MAKEFLAGS="" make && \
+	make install
+
+RUN	tar xf ${FONTCONFIG_SOURCE} && \
+	cd fontconfig-* && \
+	./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
+        --enable-libxml2 --disable-docs && \
 	make && \
 	make install
 
 RUN tar xf ${HARFBUZZ_SOURCE} && \
 	cd harfbuzz-* && \
     ./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
-        --with-freetype && \
+        --with-freetype --with-glib --with-fontconfig && \
 	make && \
 	make install
 
@@ -208,14 +206,6 @@ RUN tar xf ${FREETYPE_SOURCE} && \
     ./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
         --with-harfbuzz --with-png && \
 	make distclean clean && \
-	make && \
-	make install
-
-RUN tar xf ${LIBXML2_SOURCE} && \
-	cd libxml2-* && \
-    ./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
-		--without-history \
-		--without-python && \
 	make && \
 	make install
 
@@ -266,17 +256,10 @@ RUN tar xf ${CAIRO_SOURCE} && \
     make && \
     make install
 
-RUN	tar xf ${FONTCONFIG_SOURCE} && \
-	cd fontconfig-* && \
-	./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
-        --enable-libxml2 && \
-	make && \
-	make install
+# These flags are necessary for linking, but I don't know why
+ENV LDFLAGS="-lpng -luuid -lxml2 -lz -lbz2 -lpixman-1 ${LDFLAGS}"
 
-RUN ldconfig
-
-ENV LDFLAGS="-lpng -luuid -lxml2 -lz -lbz2 -lpixman-1 -llzma ${LDFLAGS}"
-
+# Should compile without xlib support, but xlib is found for some reason
 RUN tar xf ${PANGO_SOURCE} && \
 	cd pango-${PANGO_VERSION} && \
     sed -i 's/xlib/xlibdontfindthis/g' meson.build && \
@@ -284,24 +267,78 @@ RUN tar xf ${PANGO_SOURCE} && \
     ninja-build -C _build && \
     ninja-build -C _build install
 
+ENV CC="clang -fPIC" \
+    LDFLAGS="-Wl,-z,defs -L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64" \
+    CPPFLAGS="-I${CACHE_DIR}/include"
+
+# Later versions use Rust and have errors
+
+# ENV LIBRSVG_VERSION=2.45.6
+# ENV LIBRSVG_MINOR_VERSION=2.45
+# ENV LIBRSVG_SOURCE=librsvg-${LIBRSVG_VERSION}.tar.xz 
+
+# RUN curl -LOf https://ftp.gnome.org/pub/GNOME/sources/librsvg/${LIBRSVG_MINOR_VERSION}/${LIBRSVG_SOURCE}
+
 RUN	tar xf ${LIBRSVG_SOURCE} && \
     cd librsvg-* && \
     ./configure \
+        --disable-introspection \
         --enable-option-checking \
 		--disable-dependency-tracking \
 		--disable-shared \
 		--enable-static \
 		--disable-pixbuf-loader \
-		--disable-gtk-theme \
 		--disable-gtk-doc \
         --prefix=${TARGET_DIR} && \
-    make all && \
+    make && \
     make install
 
-RUN rm /opt/lib/*.so*
+### LibRSVG
 
-ENV LDFLAGS=-Wl,-rpath=/opt/lib
+FROM lambci/lambda:build-nodejs10.x AS librsvg
 
-RUN npm install node-pre-gyp librsvg-prebuilt --prefix ${TARGET_DIR}/nodejs --no-package-lock --build-from-source
+COPY --from=builder /opt /opt
+COPY cloud.svg /tmp/
 
-RUN node -e "require('librsvg-prebuilt')"
+RUN rsvg-convert /tmp/cloud.svg > /tmp/cloud.png && \
+    if [[ $(file /tmp/cloud.png) != *"PNG"* ]]; then \
+        echo "Error: RSVG not working properly"; exit 1; \
+    fi && \
+    rm /tmp/cloud.*
+
+ENTRYPOINT "/opt/bin/rsvg-convert"
+
+### Node 
+
+FROM builder AS node-librsvg-builder
+
+ENV CACHE_DIR=/var/task/build/cache
+ENV PKG_CONFIG_PATH="/opt/lib/pkgconfig:${CACHE_DIR}/lib64/pkgconfig:${CACHE_DIR}/lib/pkgconfig"
+
+RUN npm install node-pre-gyp librsvg-prebuilt --prefix /opt/nodejs --no-package-lock
+
+COPY binding.gyp /opt/nodejs/node_modules/librsvg-prebuilt/binding.gyp
+
+# LDFLAGS have to be "" because v8 does dynamic loading of symbols (or something like that)
+RUN cd /opt/nodejs/node_modules/librsvg-prebuilt && \
+    LDFLAGS="" V=1 ./node_modules/.bin/node-pre-gyp rebuild
+
+COPY cloud.svg cloud-test.js /tmp/
+
+RUN node /tmp/cloud-test.js && \
+    if [[ $(file /tmp/cloud-node.png) != *"PNG"* ]]; then \
+        echo "Error: RSVG not working properly"; exit 1; \
+    fi && \
+    rm /tmp/cloud.*
+
+FROM lambci/lambda:build-nodejs10.x AS node-librsvg
+
+COPY --from=node-librsvg-builder /opt /opt
+
+COPY cloud.svg cloud-test.js /tmp/
+
+RUN node /tmp/cloud-test.js && \
+    if [[ $(file /tmp/cloud-node.png) != *"PNG"* ]]; then \
+        echo "Error: RSVG not working properly"; exit 1; \
+    fi && \
+    rm /tmp/cloud.*
