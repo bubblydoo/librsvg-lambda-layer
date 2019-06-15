@@ -3,3 +3,4 @@ build
 *.pdf
 *.png
 *.svg
+!cloud.svg
