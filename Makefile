@@ -1,29 +1,13 @@
-PROJECT_ROOT = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+STACK_NAME ?= rsvg-layer 
+DOCKER_IMAGE ?= hansottowirtz/amazon-linux-librsvg:node
 
-DOCKER_IMAGE ?= lambci/lambda:build-nodejs10.x
-TARGET ?=/opt/
-
-MOUNTS = -v $(PROJECT_ROOT)result:$(TARGET)
-
-DOCKER = docker run -it --rm -w=/var/task/build
 build result: 
 	mkdir $@
 
 clean:
 	rm -rf build result
 
-bash:
-	$(DOCKER) $(MOUNTS) --entrypoint /bin/bash -t $(DOCKER_IMAGE)
-
-all libs:
-	$(DOCKER) $(MOUNTS) --entrypoint /usr/bin/make -t $(DOCKER_IMAGE) TARGET_DIR=$(TARGET) -f ../Makefile_Rsvg init $@
-
-STACK_NAME ?= rsvg-layer 
-
-result/bin/rsvg: all
-
-build/output.yaml: template.yaml 
-	mkdir build
+build/output.yaml: template.yaml build
 	aws cloudformation package --template $< --s3-bucket $(DEPLOYMENT_BUCKET) --output-template-file $@
 
 deploy: build/output.yaml
@@ -32,4 +16,8 @@ deploy: build/output.yaml
 
 deploy-example:
 	cd example && \
-		make deploy DEPLOYMENT_BUCKET=$(DEPLOYMENT_BUCKET) RSVG_STACK_NAME=$(STACK_NAME)
+	make deploy DEPLOYMENT_BUCKET=$(DEPLOYMENT_BUCKET) RSVG_STACK_NAME=$(STACK_NAME)
+
+copy-from-docker:
+	rm -rf build result
+	docker cp $$(docker run -d --entrypoint "" $(DOCKER_IMAGE) sleep 300):/opt ./result

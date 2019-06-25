@@ -1,7 +1,7 @@
 FROM amazonlinux:2.0.20190508-with-sources AS builder
 
-ENV PROJECT_ROOT=/var/task \
-    CACHE_DIR=/var/task/build/cache \
+ENV BUILD_DIR=/build \
+    CACHE_DIR=/build/cache \
     TARGET_DIR=/opt
 
 ENV PKG_CONFIG_PATH="${CACHE_DIR}/lib64/pkgconfig:${CACHE_DIR}/lib/pkgconfig" \
@@ -11,7 +11,7 @@ ENV PKG_CONFIG_PATH="${CACHE_DIR}/lib64/pkgconfig:${CACHE_DIR}/lib/pkgconfig" \
     CC=clang \
     TERM=xterm-256color
 
-WORKDIR /var/task/build
+WORKDIR /build
 
 RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
     yum install -y clang python3 tar make pkgconfig file \
@@ -94,7 +94,7 @@ RUN curl -LOf https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSIO
     curl -LOf https://zlib.net/${ZLIB_SOURCE} && \
     for i in $PWD/*.tar.*; do tar xf $i && rm $i; done
 
-ENV LD_LIBRARY_PATH="/var/task/build/cache/lib64:/var/task/build/cache/lib"
+ENV LD_LIBRARY_PATH="${CACHE_DIR}/lib64:${CACHE_DIR}/lib"
 
 # Install CMake 3
 RUN sh ${CMAKE_SOURCE} --skip-license --prefix=${CACHE_DIR} && \
@@ -166,7 +166,7 @@ RUN cd libxml2-* && \
 	make && \
 	make install
 
-ENV FREETYPE_WITHOUT_HB_DIR=${PROJECT_ROOT}/build/freetype-${FREETYPE_VERSION}-without-harfbuzz
+ENV FREETYPE_WITHOUT_HB_DIR=${BUILD_DIR}/freetype-${FREETYPE_VERSION}-without-harfbuzz
 
 RUN cp -r freetype-${FREETYPE_VERSION} /tmp/ && \
 	rm -rf ${FREETYPE_WITHOUT_HB_DIR} && \
@@ -298,8 +298,7 @@ ENTRYPOINT "/opt/bin/rsvg-convert"
 
 FROM builder AS node-librsvg-builder
 
-ENV CACHE_DIR=/var/task/build/cache
-ENV PKG_CONFIG_PATH="/opt/lib/pkgconfig:${CACHE_DIR}/lib64/pkgconfig:${CACHE_DIR}/lib/pkgconfig"
+ENV PKG_CONFIG_PATH="/opt/lib/pkgconfig:${PKG_CONFIG_PATH}"
 ENV NODE_PATH="/opt/nodejs/node_modules:${CACHE_DIR}/nodejs/node_modules"
 
 RUN curl -sL https://rpm.nodesource.com/setup_10.x | bash - && \

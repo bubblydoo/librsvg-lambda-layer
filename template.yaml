@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Static build of rsvg-convert (librsvg)  for Amazon Linux 2
+  Static build of librsvg for Amazon Linux 2 with a Node module
 
   Check out https://github.com/serverlesspub/rsvg-convert-aws-lambda-binary
   for more information.
@@ -9,8 +9,8 @@ Resources:
   RsvgConvertLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      LayerName: rsvg-convert
-      Description: Static build of rsvg-convert (librsvg) for Amazon Linux 2
+      LayerName: rsvg-node
+      Description: Static build of librsvg with a Node module
       ContentUri: result/
       CompatibleRuntimes:
         - nodejs10.x
