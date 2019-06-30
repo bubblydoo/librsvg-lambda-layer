@@ -304,7 +304,7 @@ ENV NODE_PATH="/opt/nodejs/node_modules:${CACHE_DIR}/nodejs/node_modules"
 RUN curl -sL https://rpm.nodesource.com/setup_10.x | bash - && \
     yum install -y nodejs file binutils --enablerepo=epel && \
     npm install node-pre-gyp --prefix ${CACHE_DIR}/nodejs && \
-    npm install https://github.com/hansottowirtz/node-rsvg-prebuilt \
+    npm install "git://github.com/hansottowirtz/node-rsvg-prebuilt#unlimited-flag-dirty" \
         --prefix /opt/nodejs --production --ignore-scripts
 
 COPY binding.gyp /opt/nodejs/node_modules/librsvg-prebuilt/binding.gyp
