@@ -25,24 +25,24 @@ RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.n
 RUN mkdir -p ${CACHE_DIR} && mkdir -p ${TARGET_DIR} && \
     export MAKEFLAGS="-j -l $(grep -c ^processor /proc/cpuinfo)"
 
-ENV CMAKE_VERSION=3.15.0-rc1 \
-    GLIB_VERSION=2.61.1 \
-    GLIB_MINOR_VERSION=2.61 \
-    FREETYPE_VERSION=2.10.0 \
-    HARFBUZZ_VERSION=2.5.0 \
-    PIXMAN_VERSION=0.38.4 \
+ENV CMAKE_VERSION=3.17.1 \
+    GLIB_VERSION=2.64.2 \
+    GLIB_MINOR_VERSION=2.64 \
+    FREETYPE_VERSION=2.10.1 \
+    HARFBUZZ_VERSION=2.6.4 \
+    PIXMAN_VERSION=0.40.0 \
     CAIRO_VERSION=1.17.2 \
-    LIBRSVG_VERSION=2.40.16 \
-    LIBRSVG_MINOR_VERSION=2.40 \
-    GDK_PIXBUF_VERSION=2.38.1 \
-    GDK_PIXBUF_MINOR_VERSION=2.38 \
-    LIBFFI_VERSION=3.2.1 \
+    LIBRSVG_VERSION=2.48.4 \
+    LIBRSVG_MINOR_VERSION=2.48 \
+    GDK_PIXBUF_VERSION=2.40.0 \
+    GDK_PIXBUF_MINOR_VERSION=2.40 \
+    LIBFFI_VERSION=3.3 \
     BZIP2_VERSION=1.0.6 \
     UTIL_LINUX_VERSION=2.33 \
     LIBPNG_VERSION=1.6.37 \
     OPENJP2_VERSION=2.3.1 \
-    LIBTIFF_VERSION=4.0.10 \
-    LIBCROCO_VERSION=0.6.8 \
+    LIBTIFF_VERSION=4.1.0 \
+    LIBCROCO_VERSION=0.6.13 \
     LIBCROCO_MINOR_VERSION=0.6 \
     FONTCONFIG_VERSION=2.13.0 \
     LIBJPEG_VERSION=9c \ 
@@ -80,7 +80,7 @@ RUN curl -LOf https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSIO
     curl -LOf https://www.cairographics.org/snapshots/${CAIRO_SOURCE} && \
     curl -LOf https://ftp.gnome.org/pub/GNOME/sources/librsvg/${LIBRSVG_MINOR_VERSION}/${LIBRSVG_SOURCE} && \
     curl -LOf https://ftp.gnome.org/pub/GNOME/sources/gdk-pixbuf/${GDK_PIXBUF_MINOR_VERSION}/${GDK_PIXBUF_SOURCE} && \
-    curl -LOf https://sourceware.org/pub/libffi/${LIBFFI_SOURCE} && \
+    curl -LOf https://github.com/libffi/libffi/releases/download/v${LIBFFI_VERSION}/${LIBFFI_SOURCE} && \
     curl -LOf http://prdownloads.sourceforge.net/bzip2/${BZIP2_SOURCE} && \
     curl -LOf https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v${UTIL_LINUX_VERSION}/${UTIL_LINUX_SOURCE} && \
     curl -LOf https://prdownloads.sourceforge.net/libpng/${LIBPNG_SOURCE} && \
@@ -149,7 +149,7 @@ RUN cd tiff-* && \
 
 RUN cd glib-* && \
     meson --prefix ${CACHE_DIR} _build -Dman=false -Dinternal_pcre=true -Dselinux=disabled \
-        -Ddefault_library=static -Dnls=disabled -Dlibmount=false -Dxattr=false && \
+        -Ddefault_library=static -Dnls=disabled -Dlibmount=disabled -Dxattr=false && \
     ninja-build -v -C _build && \
     ninja-build -C _build install
 
@@ -245,6 +245,7 @@ RUN cd cairo-* && \
 ENV LDFLAGS="-lpng -luuid -lxml2 -lz -lbz2 -lpixman-1 ${LDFLAGS}"
 
 # Should compile without xlib support, but xlib is found for some reason
+# In Pango 1.44.x, the gir=false/disabled flag doesn't work
 RUN cd pango-${PANGO_VERSION} && \
     sed -i 's/xlib/xlibdontfindthis/g' meson.build && \
     meson --prefix ${CACHE_DIR} _build -Dgir=false -Ddefault_library=static && \
@@ -254,14 +255,6 @@ RUN cd pango-${PANGO_VERSION} && \
 ENV CC="clang -fPIC" \
     LDFLAGS="-Wl,-z,defs -L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64" \
     CPPFLAGS="-I${CACHE_DIR}/include"
-
-# Later versions use Rust and have errors
-
-# ENV LIBRSVG_VERSION=2.45.6
-# ENV LIBRSVG_MINOR_VERSION=2.45
-# ENV LIBRSVG_SOURCE=librsvg-${LIBRSVG_VERSION}.tar.xz 
-
-# RUN curl -LOf https://ftp.gnome.org/pub/GNOME/sources/librsvg/${LIBRSVG_MINOR_VERSION}/${LIBRSVG_SOURCE}
 
 RUN	cd librsvg-* && \
     ./configure \
@@ -284,13 +277,15 @@ FROM amazonlinux:2.0.20190508-with-sources AS librsvg
 COPY --from=builder /opt /opt
 COPY cloud.svg /tmp/
 
+ENV NODE_PATH="/opt/nodejs/node_modules"
+
 RUN yum install -y binutils file && \
     strip --strip-all /opt/lib/librsvg-2.a && \
     /opt/bin/rsvg-convert /tmp/cloud.svg > /tmp/cloud.png && \
     if [[ $(file /tmp/cloud.png) != *"PNG"* ]]; then \
         echo "Error: RSVG not working properly"; exit 1; \
     fi && \
-    rm /tmp/cloud.*
+    rm /tmp/cloud*
 
 ENTRYPOINT "/opt/bin/rsvg-convert"
 
@@ -301,10 +296,11 @@ FROM builder AS node-librsvg-builder
 ENV PKG_CONFIG_PATH="/opt/lib/pkgconfig:${PKG_CONFIG_PATH}"
 ENV NODE_PATH="/opt/nodejs/node_modules:${CACHE_DIR}/nodejs/node_modules"
 
-RUN curl -sL https://rpm.nodesource.com/setup_10.x | bash - && \
-    yum install -y nodejs file binutils --enablerepo=epel && \
+# Trouble getting it to work on Node 12.x
+RUN curl -sL https://rpm.nodesource.com/setup_10.x | bash -  && \
+    yum install -y nodejs git pkgconfig && \
     npm install node-pre-gyp --prefix ${CACHE_DIR}/nodejs && \
-    npm install "git://github.com/hansottowirtz/node-rsvg-prebuilt#unlimited-flag-dirty" \
+    npm install "hansottowirtz/node-rsvg-prebuilt#unlimited-flag-dirty" \
         --prefix /opt/nodejs --production --ignore-scripts
 
 COPY binding.gyp /opt/nodejs/node_modules/librsvg-prebuilt/binding.gyp
@@ -320,7 +316,7 @@ RUN node /tmp/cloud-test.js && \
     if [[ $(file /tmp/cloud-node.png) != *"PNG"* ]]; then \
         echo "Error: RSVG not working properly"; exit 1; \
     fi && \
-    rm /tmp/cloud.*
+    rm /tmp/cloud*
 
 ### Node
 
@@ -333,7 +329,6 @@ COPY --from=node-librsvg-builder /opt /opt
 COPY cloud.svg cloud-test.js /tmp/
 
 RUN curl -sL https://rpm.nodesource.com/setup_10.x | bash - && \
-    yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
     yum install -y nodejs file binutils
 
 RUN strip --strip-all /opt/lib/librsvg-2.a && \
@@ -342,4 +337,4 @@ RUN strip --strip-all /opt/lib/librsvg-2.a && \
     if [[ $(file /tmp/cloud-node.png) != *"PNG"* ]]; then \
         echo "Error: RSVG not working properly"; exit 1; \
     fi && \
-    rm /tmp/cloud.*
+    rm /tmp/cloud*

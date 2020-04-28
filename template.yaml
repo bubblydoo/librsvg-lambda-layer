@@ -9,7 +9,7 @@ Resources:
   RsvgConvertLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      LayerName: rsvg-node
+      LayerName: rsvg
       Description: Static build of librsvg with a Node module
       ContentUri: result/
       CompatibleRuntimes:

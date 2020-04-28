@@ -22,7 +22,8 @@ For manual deployments and custom builds, read below...
 ## Compiling the code
 
 * start Docker services
-* `docker build . -t amazon-linux-librsvg:node`
+* `docker build . --target librsvg -t amazon-linux-librsvg`
+* `docker build . --target node-librsvg  -t amazon-linux-librsvg:node`
 
 * [`Dockerfile`](Dockerfile) is used to download all the libraries.
 * [`Makefile`](Makefile) is used to copy the built binary from docker and to deploy the layer with CloudFormation.
