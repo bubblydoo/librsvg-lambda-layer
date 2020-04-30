@@ -23,7 +23,7 @@ For manual deployments and custom builds, read below...
 
 * start Docker services
 * `docker build . --target librsvg -t amazon-linux-librsvg`
-* `docker build . --target node-librsvg  -t amazon-linux-librsvg:node`
+* (`docker build . --target builder -t amazon-linux-librsvg-builder`)
 
 * [`Dockerfile`](Dockerfile) is used to download all the libraries.
 * [`Makefile`](Makefile) is used to copy the built binary from docker and to deploy the layer with CloudFormation.
@@ -35,8 +35,7 @@ The output will be in the `result` dir.
 Run the following command to deploy the compiled result as a layer in your AWS account.
 
 ```
-# docker pull hansottowirtz/amazon-linux-librsvg:node
-make copy-from-docker DOCKER_IMAGE=hansottowirtz/amazon-linux-librsvg:node
+make copy-from-docker DOCKER_IMAGE=amazon-linux-librsvg
 make deploy DEPLOYMENT_BUCKET=<YOUR BUCKET NAME>
 ```
 

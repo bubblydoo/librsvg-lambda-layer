@@ -1,4 +1,4 @@
-FROM amazonlinux:2.0.20190508-with-sources AS builder
+FROM amazonlinux:2.0.20200406.0-with-sources AS builder
 
 ENV BUILD_DIR=/build \
     CACHE_DIR=/build/cache \
@@ -13,11 +13,13 @@ ENV PKG_CONFIG_PATH="${CACHE_DIR}/lib64/pkgconfig:${CACHE_DIR}/lib/pkgconfig" \
 
 WORKDIR /build
 
+# Download all needed build dependencies
+# bzip2 is installed, but will also be compiled from source
 RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
     yum install -y clang python3 tar make pkgconfig file \
         gcc gcc-c++ \
         intltool flex bison shared-mime-info gperf \
-		ninja-build \
+		ninja-build xz bzip2 \
         glibc-static --enablerepo=epel && \
 	pip3 install --user meson && \
 	curl https://sh.rustup.rs -sSf | sh -s -- -y
@@ -25,6 +27,7 @@ RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.n
 RUN mkdir -p ${CACHE_DIR} && mkdir -p ${TARGET_DIR} && \
     export MAKEFLAGS="-j -l $(grep -c ^processor /proc/cpuinfo)"
 
+# Can't disable introspection in Pango 1.44.x
 ENV CMAKE_VERSION=3.17.1 \
     GLIB_VERSION=2.64.2 \
     GLIB_MINOR_VERSION=2.64 \
@@ -153,11 +156,21 @@ RUN cd glib-* && \
     ninja-build -v -C _build && \
     ninja-build -C _build install
 
+ENV GDK_PIXBUF_MODULEDIR=${TARGET_DIR}/lib/gdk-pixbuf-loaders \
+    GDK_PIXBUF_MODULE_FILE=${TARGET_DIR}/lib/gdk-pixbuf-loaders.cache
+
+# builtin_loaders: eh
 RUN cd gdk-pixbuf-* && \
     meson --prefix ${CACHE_DIR} _build -Dgir=false -Dx11=false -Ddefault_library=static \
-        -Drelocatable=true -Dgio_sniffing=false -Dbuiltin_loaders=none -Dinstalled_tests=false && \
+        -Drelocatable=true -Dgio_sniffing=false -Dbuiltin_loaders=jpeg,png -Dinstalled_tests=false && \
     ninja-build -C _build && \
     ninja-build -C _build install
+
+RUN mkdir -p ${TARGET_DIR}/lib ${TARGET_DIR}/bin && \
+    cp -r $(pkg-config --variable=gdk_pixbuf_moduledir gdk-pixbuf-2.0) $GDK_PIXBUF_MODULEDIR && \
+    cp /build/cache/bin/gdk-pixbuf-query-loaders ${TARGET_DIR}/bin/gdk-pixbuf-query-loaders
+
+RUN /opt/bin/gdk-pixbuf-query-loaders --update-cache
 
 RUN cd libxml2-* && \
     ./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
@@ -177,8 +190,7 @@ RUN cp -r freetype-${FREETYPE_VERSION} /tmp/ && \
 	make && \
 	make install
 
-RUN	tar xf fontconfig-2.13.0.tar.bz2 && rm fontconfig-2.13.0.tar.bz2 && \
-    cd fontconfig-* && \
+RUN	cd fontconfig-* && \
 	./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
         --enable-libxml2 --disable-docs && \
 	make && \
@@ -256,23 +268,31 @@ ENV CC="clang -fPIC" \
     LDFLAGS="-Wl,-z,defs -L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64" \
     CPPFLAGS="-I${CACHE_DIR}/include"
 
+# Also inspired by https://github.com/Homebrew/homebrew-core/blob/master/Formula/librsvg.rb
 RUN	cd librsvg-* && \
     ./configure \
         --prefix=${TARGET_DIR} \
         --disable-introspection \
+        --disable-Bsymbolic \
         --enable-option-checking \
 		--disable-dependency-tracking \
 		--disable-shared \
 		--enable-static \
 		--disable-pixbuf-loader \
-		--disable-gtk-doc && \
-    make && \
-    make install && \
-    rm -r ${TARGET_DIR}/share
+        --enable-tools=yes \
+		--disable-gtk-doc \
+        --disable-gtk-doc-html && \
+    make || tail -f /dev/null
+
+RUN cd librsvg-* && make install
+
+# RUN make install gdk_pixbuf_binarydir=/opt/lib/gdk-pixbuf-loaders gdk_pixbuf_moduledir=/opt/lib/gdk-pixbuf-loaders
+
+RUN rm -r ${TARGET_DIR}/share
 
 ### LibRSVG
 
-FROM amazonlinux:2.0.20190508-with-sources AS librsvg
+FROM amazonlinux:2.0.20200406.0-with-sources AS librsvg
 
 COPY --from=builder /opt /opt
 COPY cloud.svg /tmp/
@@ -280,61 +300,13 @@ COPY cloud.svg /tmp/
 ENV NODE_PATH="/opt/nodejs/node_modules"
 
 RUN yum install -y binutils file && \
-    strip --strip-all /opt/lib/librsvg-2.a && \
+    # strip --strip-all /opt/lib/librsvg-2.a && \
     /opt/bin/rsvg-convert /tmp/cloud.svg > /tmp/cloud.png && \
     if [[ $(file /tmp/cloud.png) != *"PNG"* ]]; then \
         echo "Error: RSVG not working properly"; exit 1; \
     fi && \
+    echo "Cloud PNG size: $(du -sh /tmp/cloud.png)" && \
+    echo "Cloud PNG file: $(file /tmp/cloud.png)" && \
     rm /tmp/cloud*
 
 ENTRYPOINT "/opt/bin/rsvg-convert"
-
-### Node Builder
-
-FROM builder AS node-librsvg-builder
-
-ENV PKG_CONFIG_PATH="/opt/lib/pkgconfig:${PKG_CONFIG_PATH}"
-ENV NODE_PATH="/opt/nodejs/node_modules:${CACHE_DIR}/nodejs/node_modules"
-
-# Trouble getting it to work on Node 12.x
-RUN curl -sL https://rpm.nodesource.com/setup_10.x | bash -  && \
-    yum install -y nodejs git pkgconfig && \
-    npm install node-pre-gyp --prefix ${CACHE_DIR}/nodejs && \
-    npm install "hansottowirtz/node-rsvg-prebuilt#unlimited-flag-dirty" \
-        --prefix /opt/nodejs --production --ignore-scripts
-
-COPY binding.gyp /opt/nodejs/node_modules/librsvg-prebuilt/binding.gyp
-
-# LDFLAGS have to be "" because v8 does dynamic loading of symbols (or something like that)
-RUN cd /opt/nodejs/node_modules/librsvg-prebuilt && \
-    LDFLAGS="" V=1 ${CACHE_DIR}/nodejs/node_modules/.bin/node-pre-gyp rebuild && \
-    rm -r ${TARGET_DIR}/nodejs/node_modules/librsvg-prebuilt/build/Release
-
-COPY cloud.svg cloud-test.js /tmp/
-
-RUN node /tmp/cloud-test.js && \
-    if [[ $(file /tmp/cloud-node.png) != *"PNG"* ]]; then \
-        echo "Error: RSVG not working properly"; exit 1; \
-    fi && \
-    rm /tmp/cloud*
-
-### Node
-
-FROM amazonlinux:2.0.20190508-with-sources AS node-librsvg
-
-ENV NODE_PATH="/opt/nodejs/node_modules"
-
-COPY --from=node-librsvg-builder /opt /opt
-
-COPY cloud.svg cloud-test.js /tmp/
-
-RUN curl -sL https://rpm.nodesource.com/setup_10.x | bash - && \
-    yum install -y nodejs file binutils
-
-RUN strip --strip-all /opt/lib/librsvg-2.a && \
-    strip --strip-all /opt/nodejs/node_modules/librsvg-prebuilt/build/rsvg.node && \
-    node /tmp/cloud-test.js && \
-    if [[ $(file /tmp/cloud-node.png) != *"PNG"* ]]; then \
-        echo "Error: RSVG not working properly"; exit 1; \
-    fi && \
-    rm /tmp/cloud*
