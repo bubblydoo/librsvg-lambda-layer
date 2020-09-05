@@ -190,6 +190,7 @@ RUN cp -r freetype-${FREETYPE_VERSION} /tmp/ && \
 	make && \
 	make install
 
+# TODO: --sysconfdir=/opt or FONTCONFIG_PATH ?
 RUN	cd fontconfig-* && \
 	./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
         --enable-libxml2 --disable-docs && \
@@ -299,9 +300,19 @@ COPY cloud.svg /tmp/
 
 ENV NODE_PATH="/opt/nodejs/node_modules"
 
-RUN yum install -y binutils file && \
-    # strip --strip-all /opt/lib/librsvg-2.a && \
-    /opt/bin/rsvg-convert /tmp/cloud.svg > /tmp/cloud.png && \
+RUN yum install -y binutils file
+
+ENV GDK_PIXBUF_MODULEDIR=/opt/lib/gdk-pixbuf-loaders \
+    GDK_PIXBUF_MODULE_FILE=/opt/lib/gdk-pixbuf-loaders.cache
+
+RUN strip --strip-all /opt/bin/rsvg-convert && \
+    rm -r /opt/lib && rm -r /opt/include && rm /opt/bin/gdk-pixbuf-query-loaders
+
+# Stripping is possible and shaves off a lot of bytes, but we're deleting them anyway
+# RUN strip --strip-all /opt/lib/librsvg-2.a && \
+#     strip --strip-all /opt/bin/gdk-pixbuf-query-loaders
+
+RUN /opt/bin/rsvg-convert /tmp/cloud.svg > /tmp/cloud.png && \
     if [[ $(file /tmp/cloud.png) != *"PNG"* ]]; then \
         echo "Error: RSVG not working properly"; exit 1; \
     fi && \
