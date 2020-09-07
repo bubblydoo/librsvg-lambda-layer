@@ -48,7 +48,7 @@ ENV CMAKE_VERSION=3.18.2 \
     LIBCROCO_VERSION=0.6.13 \
     LIBCROCO_MINOR_VERSION=0.6 \
     FONTCONFIG_VERSION=2.13.0 \
-    LIBJPEG_VERSION=9c \ 
+    LIBJPEG_VERSION=9c \
     PANGO_VERSION=1.43.0 \
     PANGO_MINOR_VERSION=1.43 \
     LIBXML2_VERSION=2.9.9 \
@@ -283,7 +283,7 @@ RUN	cd librsvg-* && \
         --enable-tools=yes \
 		--disable-gtk-doc \
         --disable-gtk-doc-html && \
-    make || tail -f /dev/null
+    make
 
 RUN cd librsvg-* && make install
 
@@ -297,8 +297,6 @@ FROM amazonlinux:2.0.20200406.0-with-sources AS librsvg
 
 COPY --from=builder /opt /opt
 COPY cloud.svg /tmp/
-
-ENV NODE_PATH="/opt/nodejs/node_modules"
 
 RUN yum install -y binutils file
 
@@ -321,3 +319,14 @@ RUN /opt/bin/rsvg-convert /tmp/cloud.svg > /tmp/cloud.png && \
     rm /tmp/cloud*
 
 ENTRYPOINT "/opt/bin/rsvg-convert"
+
+FROM librsvg AS librsvg-layer
+
+RUN yum install -y zip
+
+RUN cd /opt && zip -r /librsvg-layer.zip .
+
+RUN echo "cp librsvg-layer.zip /dist/librsvg-layer.zip" > /entrypoint.sh && \
+  chmod +x entrypoint.sh
+
+ENTRYPOINT "/entrypoint.sh"

@@ -1,6 +1,6 @@
 # LibRSVG for AWS Lambda
 
-Scripts to compile LibRSVG for AWS Lambda instances powered by Amazon Linux 2.x.
+Scripts to statically compile LibRSVG 2.49.5 for AWS Lambda instances powered by Amazon Linux 2.x.
 
 ## Usage
 
@@ -8,38 +8,54 @@ The `rsvg` binary will be in `/opt/bin/rsvg-convert` after linking the layer to 
 
 ## Prerequisites
 
-* Docker desktop
-* Unix Make environment
+* Docker
 * AWS command line utilities (just for deployment)
 
 ## Compiling the code
 
-* start Docker services
-* `docker build . --target librsvg -t amazon-linux-librsvg`
-* (`docker build . --target builder -t amazon-linux-librsvg-builder`)
-
-* [`Dockerfile`](Dockerfile) is used to download all the libraries.
-* [`Makefile`](Makefile) is used to copy the built binary from docker and to deploy the layer with CloudFormation.
-
-The output will be in the `result` dir.
-
-## Deploying to AWS as a layer
-
-Run the following command to deploy the compiled result as a layer in your AWS account.
-
+* Clone the repository
+```bash
+git clone github.com/bubblydoo/librsvg-lambda-layer
+cd librsvg-lambda-layer
 ```
-make copy-from-docker DOCKER_IMAGE=amazon-linux-librsvg
-make deploy DEPLOYMENT_BUCKET=<YOUR BUCKET NAME>
+
+* Start Docker services and build image (this might take a while)
+```bash
+docker build . --target librsvg-layer -t amazon-linux-librsvg-layer
+# docker build . --target librsvg -t amazon-linux-librsvg
+# docker build . --target builder -t amazon-linux-librsvg-builder
+```
+
+* Copy zip to ./dist
+```bash
+docker run -v "$PWD/dist":/dist amazon-linux-librsvg-layer
+```
+
+* Inspect layer content
+```bash
+unzip -l dist/librsvg-layer.zip
+```
+
+* Deploy to AWS
+```bash
+aws lambda publish-layer-version \
+  --layer-name rsvg \
+  --description "Librsvg layer" \
+  --license-info "MIT License" \
+  --zip-file fileb://dist/librsvg-layer.zip \
+  --compatible-runtimes nodejs12.x
 ```
 
 ### Compiled info
 
-`librsvg-convert`: version 2.49.5
+`rsvg-convert`: version 2.49.5
 
-### Configuring the deployment
+### Caveats
 
-By default, this uses `rsvg-layer` as the stack name. Provide a `STACK_NAME` variable when
-calling `make deploy` to use an alternative name.
+* Images with `xlink:href="file://` do not load properly. You can inline the files as a `data://` uri as a workaround.
+* Only jpeg and png builtin loaders are enabled (for usage with `data://`), but more can be enabled in `Dockerfile`
+
+## More information
 
 For more information, check out:
 

@@ -1,6 +1,8 @@
 result
+dist
 build
 tmp
+.vscode
 *.pdf
 *.png
 *.svg
