@@ -1,17 +1,10 @@
-# LibRSVG for AWS Lambda with Node module
+# LibRSVG for AWS Lambda
 
-Scripts to compile LibRSVG for AWS Lambda instances powered by Amazon Linux 2.x, such as the `nodejs10.x` runtime. Also includes the `librsvg-prebuilt` Node module which is compiled with `gyp` on Amazon Linux.
+Scripts to compile LibRSVG for AWS Lambda instances powered by Amazon Linux 2.x.
 
 ## Usage
 
-Absolutely the easiest way of using this is to pull it directly from the AWS Serverless Application repository into a CloudFormation/SAM application, or deploy directly from the Serverless Application Repository into your account, and then link as a layer. 
-
 The `rsvg` binary will be in `/opt/bin/rsvg-convert` after linking the layer to a Lambda function.
-The `librsvg-prebuilt` npm package will be installed in `/opt/nodejs/node_modules`, which is in the default `NODE_PATH`
-
-For more information, check out the [rsvg-convert-lambda-layer](https://serverlessrepo.aws.amazon.com/applications/arn:aws:serverlessrepo:us-east-1:145266761615:applications~rsvg-convert-lambda-layer) application in the Serverless App Repository.
-
-For manual deployments and custom builds, read below...
 
 ## Prerequisites
 
@@ -41,20 +34,12 @@ make deploy DEPLOYMENT_BUCKET=<YOUR BUCKET NAME>
 
 ### Compiled info
 
-`librsvg-convert`: version 2.40.16
+`librsvg-convert`: version 2.49.5
 
 ### Configuring the deployment
 
 By default, this uses `rsvg-layer` as the stack name. Provide a `STACK_NAME` variable when
 calling `make deploy` to use an alternative name.
-
-### example usage
-
-An example project is in the [example](example) directory. It sets up two buckets, and listens to file uploads on the first bucket to convert and generate PDF files from SVG images. You can deploy it from the root Makefile using:
-
-```
-make deploy-example DEPLOYMENT_BUCKET=<YOUR BUCKET NAME>
-```
 
 For more information, check out:
 
@@ -62,8 +47,8 @@ For more information, check out:
 
 ## Author
 
-Gojko Adzic <https://gojko.net>
 Hans Otto Wirtz <https://github.com/hansottowirtz>
+Gojko Adzic <https://gojko.net>
 
 ## License
 
