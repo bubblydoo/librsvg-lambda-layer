@@ -11,7 +11,7 @@ The `rsvg` binary will be in `/opt/bin/rsvg-convert` after linking the layer to 
 * Docker
 * AWS command line utilities (just for deployment)
 
-## Compiling the code
+## Compilation and deployment
 
 * Clone the repository
 ```bash
