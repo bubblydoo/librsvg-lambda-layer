@@ -1,6 +1,12 @@
 name: Build Docker Layer
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
 
 jobs:
   build:
@@ -8,13 +14,28 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-    - name: Docker meta
+    - name: Variables
+      id: vars
+      run: |
+        librsvg_version=$(cat Dockerfile | grep -Po '(?<=LIBRSVG_VERSION\=)(\d{1,3}.\d{1,3}.\d{1,3})')
+        sha_short=$(git rev-parse --short HEAD)
+        echo "::set-output name=librsvg_version::$librsvg_version"
+        echo "::set-output name=sha_short::$sha_short"
+        if [[ "$GITHUB_EVENT_NAME" == "push" ]] && [[ "$GITHUB_REF" == "refs/heads/master" ]]
+        then
+          echo "::set-output name=docker_tags::latest,$librsvg_version,sha-$sha_short"
+        else
+          echo "::set-output name=docker_tags::sha-$sha_short"
+        fi
+    - name: Docker meta master
+      if: github.ref == 'refs/heads/master' && github.event_name == 'push'
       id: docker_meta
       uses: crazy-max/ghaction-docker-meta@v1
       with:
         images: bubblydoo/amazon-linux-librsvg-layer
-        tag-sha: true
-    - name: Login to DockerHub
+        tag-custom: ${{ steps.vars.outputs.docker_tags }}
+        tag-custom-only: true
+    - name: Login to Docker Hub
       if: github.event_name != 'pull_request'
       uses: docker/login-action@v1
       with:
@@ -29,8 +50,10 @@ jobs:
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.docker_meta.outputs.tags }}
         labels: ${{ steps.docker_meta.outputs.labels }}
+        cache-from: type=registry,ref=bubblydoo/amazon-linux-librsvg-layer:latest
+        cache-to: type=inline
     - name: Copy artifacts
-      run: docker run -v "${{ github.workspace }}/dist":/dist bubblydoo/amazon-linux-librsvg-layer
+      run: docker run -v "${{ github.workspace }}/dist":/dist bubblydoo/amazon-linux-librsvg-layer:sha-${{ steps.vars.sha_short }}
     - name: Upload artifacts
       uses: actions/upload-artifact@v2
       with:
