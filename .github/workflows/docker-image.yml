@@ -52,7 +52,7 @@ jobs:
         cache-from: type=registry,ref=hansottowirtz/amazon-linux-librsvg-layer:latest
         cache-to: type=inline
     - name: Copy artifacts
-      run: docker run -v "${{ github.workspace }}/dist":/dist hansottowirtz/amazon-linux-librsvg-layer:sha-${{ steps.vars.sha_short }}
+      run: docker run -v "${{ github.workspace }}/dist":/dist hansottowirtz/amazon-linux-librsvg-layer:sha-${{ steps.vars.outputs.sha_short }}
     - name: Upload artifacts
       uses: actions/upload-artifact@v2
       with:
