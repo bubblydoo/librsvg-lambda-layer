@@ -1,10 +1,6 @@
 name: Build Docker Layer
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master, setup-github-actions ]
+on: [push, pull_request]
 
 jobs:
   build:
@@ -18,12 +14,25 @@ jobs:
       with:
         images: bubblydoo/amazon-linux-librsvg-layer
         tag-sha: true
+    - name: Login to DockerHub
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     - name: Build and push
       id: docker_build
       uses: docker/build-push-action@v2
       with:
         context: .
         file: ./Dockerfile
-        push: false
+        push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.docker_meta.outputs.tags }}
         labels: ${{ steps.docker_meta.outputs.labels }}
+    - name: Copy artifacts
+      run: docker run -v "${{ github.workspace }}/dist":/dist bubblydoo/amazon-linux-librsvg-layer
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: Layer ZIP
+        path: dist/librsvg-layer.zip
