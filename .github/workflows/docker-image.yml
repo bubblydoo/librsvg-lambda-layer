@@ -32,7 +32,7 @@ jobs:
       id: docker_meta
       uses: crazy-max/ghaction-docker-meta@v1
       with:
-        images: bubblydoo/amazon-linux-librsvg-layer
+        images: ${{ secrets.DOCKERHUB_USERNAME }}/amazon-linux-librsvg-layer
         tag-custom: ${{ steps.vars.outputs.docker_tags }}
         tag-custom-only: true
     - name: Login to Docker Hub
@@ -50,10 +50,10 @@ jobs:
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.docker_meta.outputs.tags }}
         labels: ${{ steps.docker_meta.outputs.labels }}
-        cache-from: type=registry,ref=bubblydoo/amazon-linux-librsvg-layer:latest
+        cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/amazon-linux-librsvg-layer:latest
         cache-to: type=inline
     - name: Copy artifacts
-      run: docker run -v "${{ github.workspace }}/dist":/dist bubblydoo/amazon-linux-librsvg-layer:sha-${{ steps.vars.sha_short }}
+      run: docker run -v "${{ github.workspace }}/dist":/dist ${{ secrets.DOCKERHUB_USERNAME }}/amazon-linux-librsvg-layer:sha-${{ steps.vars.sha_short }}
     - name: Upload artifacts
       uses: actions/upload-artifact@v2
       with:
