@@ -24,10 +24,10 @@ jobs:
         if [[ "$GITHUB_EVENT_NAME" == "push" ]] && [[ "$GITHUB_REF" == "refs/heads/master" ]]
         then
           echo "::set-output name=deploy::true"
-          echo "::set-output name=docker_tags::latest,$librsvg_version,sha-$sha_short"
+          echo "::set-output name=docker_tags::dev,latest,$librsvg_version,sha-$sha_short"
         else
           echo "::set-output name=deploy::false"
-          echo "::set-output name=docker_tags::sha-$sha_short"
+          echo "::set-output name=docker_tags::dev,sha-$sha_short"
         fi
     - name: Docker meta
       id: docker_meta
@@ -56,9 +56,31 @@ jobs:
         cache-from: type=registry,ref=hansottowirtz/amazon-linux-librsvg-layer:latest
         cache-to: type=inline
     - name: Copy artifacts
-      run: docker run -v "${{ github.workspace }}/dist":/dist hansottowirtz/amazon-linux-librsvg-layer:sha-${{ steps.vars.outputs.sha_short }}
+      run: docker run -v "${{ github.workspace }}/dist":/dist hansottowirtz/amazon-linux-librsvg-layer:dev
     - name: Upload artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: Layer ZIP
+        name: librsvg-lambda-layer.zip
         path: dist/librsvg-layer.zip
+    - name: Create release
+      if: ${{ steps.vars.outputs.deploy == 'true' }}
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.vars.outputs.librsvg_version }}
+        release_name: Version ${{ steps.vars.outputs.librsvg_version }}
+        draft: false
+        prerelease: false
+    - name: Upload release asset
+      if: ${{ steps.vars.outputs.deploy == 'true' }}
+      id: upload_release_asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/librsvg-layer.zip
+        asset_name: librsvg-lambda-layer.zip
+        asset_content_type: application/zip
