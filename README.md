@@ -1,10 +1,16 @@
 # LibRSVG for AWS Lambda
 
-Scripts to statically compile LibRSVG 2.49.5 for AWS Lambda instances powered by Amazon Linux 2.x.
+![Build Docker Layer](https://github.com/bubblydoo/librsvg-lambda-layer/workflows/Build%20Docker%20Layer/badge.svg)
+
+Scripts to statically compile LibRSVG 2.50.2 for AWS Lambda instances powered by Amazon Linux 2.x.
 
 ## Usage
 
 The `rsvg` binary will be in `/opt/bin/rsvg-convert` after linking the layer to a Lambda function.
+
+## Download
+
+The Lambda Layer ZIP can be found in [Releases](https://github.com/bubblydoo/librsvg-lambda-layer/releases).
 
 ## Prerequisites
 
@@ -48,7 +54,7 @@ aws lambda publish-layer-version \
 
 ### Compiled info
 
-`rsvg-convert`: version 2.49.5
+`rsvg-convert`: version 2.50.2
 
 ### Caveats
 
