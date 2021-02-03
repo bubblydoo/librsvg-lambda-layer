@@ -1,8 +1,9 @@
 # LibRSVG for AWS Lambda
 
+![Releases](https://img.shields.io/github/v/release/bubblydoo/librsvg-lambda-layer.svg)
 ![Build Docker Layer](https://github.com/bubblydoo/librsvg-lambda-layer/workflows/Build%20Docker%20Layer/badge.svg)
 
-Scripts to statically compile LibRSVG 2.50.3 for AWS Lambda instances powered by Amazon Linux 2.x.
+Scripts to statically compile LibRSVG for AWS Lambda instances powered by Amazon Linux 2.x.
 
 ## Usage
 
@@ -54,7 +55,7 @@ aws lambda publish-layer-version \
 
 ### Compiled info
 
-`rsvg-convert`: version 2.50.3
+`rsvg-convert`: version ![Version](https://img.shields.io/github/v/release/bubblydoo/librsvg-lambda-layer.svg?style=flat&label=)
 
 ### Caveats
 
