@@ -27,7 +27,6 @@ RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.n
 RUN mkdir -p ${CACHE_DIR} && mkdir -p ${TARGET_DIR} && \
     export MAKEFLAGS="-j -l $(grep -c ^processor /proc/cpuinfo)"
 
-# Can't disable introspection in Pango 1.44.x
 ENV CMAKE_VERSION=3.18.2 \
     GLIB_VERSION=2.65.3 \
     GLIB_MINOR_VERSION=2.65 \
@@ -49,8 +48,8 @@ ENV CMAKE_VERSION=3.18.2 \
     LIBCROCO_MINOR_VERSION=0.6 \
     FONTCONFIG_VERSION=2.13.0 \
     LIBJPEG_VERSION=9c \
-    PANGO_VERSION=1.43.0 \
-    PANGO_MINOR_VERSION=1.43 \
+    PANGO_VERSION=1.48.4 \
+    PANGO_MINOR_VERSION=1.48 \
     LIBXML2_VERSION=2.9.9 \
     ZLIB_VERSION=1.2.11
 
@@ -261,7 +260,7 @@ ENV LDFLAGS="-lpng -luuid -lxml2 -lz -lbz2 -lpixman-1 ${LDFLAGS}"
 # In Pango 1.44.x, the gir=false/disabled flag doesn't work
 RUN cd pango-${PANGO_VERSION} && \
     sed -i 's/xlib/xlibdontfindthis/g' meson.build && \
-    meson --prefix ${CACHE_DIR} _build -Dgir=false -Ddefault_library=static && \
+    meson --prefix ${CACHE_DIR} _build -Ddefault_library=static -Dintrospection=disabled && \
     ninja -C _build && \
     ninja -C _build install
 
