@@ -19,9 +19,9 @@ RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.n
     yum install -y clang python3 tar make pkgconfig file \
         gcc gcc-c++ \
         intltool flex bison shared-mime-info gperf \
-		ninja-build xz bzip2 \
+		xz bzip2 \
         glibc-static --enablerepo=epel && \
-	pip3 install --user meson && \
+	pip3 install --user meson ninja && \
 	curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 RUN mkdir -p ${CACHE_DIR} && mkdir -p ${TARGET_DIR} && \
@@ -153,8 +153,8 @@ RUN cd tiff-* && \
 RUN cd glib-* && \
     meson --prefix ${CACHE_DIR} _build -Dman=false -Dinternal_pcre=true -Dselinux=disabled \
         -Ddefault_library=static -Dnls=disabled -Dlibmount=disabled -Dxattr=false && \
-    ninja-build -v -C _build && \
-    ninja-build -C _build install
+    ninja -v -C _build && \
+    ninja -C _build install
 
 ENV GDK_PIXBUF_MODULEDIR=${TARGET_DIR}/lib/gdk-pixbuf-loaders \
     GDK_PIXBUF_MODULE_FILE=${TARGET_DIR}/lib/gdk-pixbuf-loaders.cache
@@ -163,8 +163,8 @@ ENV GDK_PIXBUF_MODULEDIR=${TARGET_DIR}/lib/gdk-pixbuf-loaders \
 RUN cd gdk-pixbuf-* && \
     meson --prefix ${CACHE_DIR} _build -Dgir=false -Dx11=false -Ddefault_library=static \
         -Drelocatable=true -Dgio_sniffing=false -Dbuiltin_loaders=jpeg,png -Dinstalled_tests=false && \
-    ninja-build -C _build && \
-    ninja-build -C _build install
+    ninja -C _build && \
+    ninja -C _build install
 
 RUN mkdir -p ${TARGET_DIR}/lib ${TARGET_DIR}/bin && \
     cp -r $(pkg-config --variable=gdk_pixbuf_moduledir gdk-pixbuf-2.0) $GDK_PIXBUF_MODULEDIR && \
@@ -262,8 +262,8 @@ ENV LDFLAGS="-lpng -luuid -lxml2 -lz -lbz2 -lpixman-1 ${LDFLAGS}"
 RUN cd pango-${PANGO_VERSION} && \
     sed -i 's/xlib/xlibdontfindthis/g' meson.build && \
     meson --prefix ${CACHE_DIR} _build -Dgir=false -Ddefault_library=static && \
-    ninja-build -C _build && \
-    ninja-build -C _build install
+    ninja -C _build && \
+    ninja -C _build install
 
 ENV CC="clang -fPIC" \
     LDFLAGS="-Wl,-z,defs -L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64" \
