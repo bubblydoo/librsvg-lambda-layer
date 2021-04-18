@@ -34,8 +34,8 @@ ENV CMAKE_VERSION=3.18.2 \
     HARFBUZZ_VERSION=2.6.7 \
     PIXMAN_VERSION=0.40.0 \
     CAIRO_VERSION=1.17.4 \
-    LIBRSVG_VERSION=2.50.4 \
-    LIBRSVG_MINOR_VERSION=2.50 \
+    LIBRSVG_VERSION=2.51.1 \
+    LIBRSVG_MINOR_VERSION=2.51 \
     GDK_PIXBUF_VERSION=2.42.2 \
     GDK_PIXBUF_MINOR_VERSION=2.42 \
     LIBFFI_VERSION=3.3 \
@@ -264,9 +264,7 @@ RUN cd pango-${PANGO_VERSION} && \
     ninja -C _build && \
     ninja -C _build install
 
-ENV CC="clang -fPIC" \
-    LDFLAGS="-Wl,-z,defs -L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64" \
-    CPPFLAGS="-I${CACHE_DIR}/include"
+ENV RUSTFLAGS="-lpng -luuid -lxml2 -lz -lbz2 -lpixman-1 -L${CACHE_DIR}/lib -L${CACHE_DIR}/lib64"
 
 # Also inspired by https://github.com/Homebrew/homebrew-core/blob/master/Formula/librsvg.rb
 RUN	cd librsvg-* && \
