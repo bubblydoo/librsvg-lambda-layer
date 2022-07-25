@@ -63,7 +63,7 @@ aws lambda publish-layer-version \
   --compatible-architectures x86_64
 
 aws lambda publish-layer-version \
-  --layer-name rsvg \
+  --layer-name rsvg-arm64 \
   --description "Librsvg layer for arm64" \
   --license-info "MIT License" \
   --zip-file fileb://dist/librsvg-layer.aarch64.zip \
