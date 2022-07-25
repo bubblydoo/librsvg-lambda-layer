@@ -33,24 +33,42 @@ docker build . --target librsvg-layer -t amazon-linux-librsvg-layer
 # docker build . --target builder -t amazon-linux-librsvg-builder
 ```
 
+or for a multiplatform image:
+
+```bash
+docker buildx create --use # if you didn't make a builder yet
+docker buildx build . --platform linux/amd64,linux/arm64 --target librsvg-layer -t amazon-linux-librsvg-layer
+```
+
 * Copy zip to ./dist
 ```bash
-docker run -v "$PWD/dist":/dist amazon-linux-librsvg-layer
+docker run --platform linux/amd64 -v "$PWD/dist":/dist amazon-linux-librsvg-layer
+docker run --platform linux/arm64 -v "$PWD/dist":/dist amazon-linux-librsvg-layer
 ```
 
 * Inspect layer content
 ```bash
-unzip -l dist/librsvg-layer.zip
+unzip -l dist/librsvg-layer.x86_64.zip
+unzip -l dist/librsvg-layer.aarch64.zip
 ```
 
 * Deploy to AWS
 ```bash
 aws lambda publish-layer-version \
   --layer-name rsvg \
-  --description "Librsvg layer" \
+  --description "Librsvg layer for x86_64" \
   --license-info "MIT License" \
-  --zip-file fileb://dist/librsvg-layer.zip \
-  --compatible-runtimes nodejs12.x
+  --zip-file fileb://dist/librsvg-layer.x86_64.zip \
+  --compatible-runtimes nodejs12.x nodejs14.x nodejs16.x \
+  --compatible-architectures x86_64
+
+aws lambda publish-layer-version \
+  --layer-name rsvg \
+  --description "Librsvg layer for arm64" \
+  --license-info "MIT License" \
+  --zip-file fileb://dist/librsvg-layer.aarch64.zip \
+  --compatible-runtimes nodejs12.x nodejs14.x nodejs16.x \
+  --compatible-architectures arm64
 ```
 
 ### Compiled info

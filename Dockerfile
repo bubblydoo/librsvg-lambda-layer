@@ -1,4 +1,4 @@
-FROM amazonlinux:2.0.20200406.0-with-sources AS builder
+FROM amazonlinux:2-with-sources AS builder
 
 ENV BUILD_DIR=/build \
     CACHE_DIR=/build/cache \
@@ -15,12 +15,12 @@ WORKDIR /build
 
 # Download all needed build dependencies
 # bzip2 is installed, but will also be compiled from source
-RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
-    yum install -y clang python3 tar make pkgconfig file \
+RUN yum install -y \
+        clang python3 python3-pip tar make pkgconfig file \
         gcc gcc-c++ \
         intltool flex bison shared-mime-info gperf \
-		xz bzip2 \
-        glibc-static --enablerepo=epel && \
+		    xz bzip2 gzip git \
+        glibc-static && \
 	pip3 install --user meson ninja && \
 	curl https://sh.rustup.rs -sSf | sh -s -- -y
 
@@ -28,28 +28,28 @@ RUN mkdir -p ${CACHE_DIR} && mkdir -p ${TARGET_DIR} && \
     export MAKEFLAGS="-j -l $(grep -c ^processor /proc/cpuinfo)"
 
 ENV CMAKE_VERSION=3.18.2 \
-    GLIB_VERSION=2.65.3 \
-    GLIB_MINOR_VERSION=2.65 \
-    FREETYPE_VERSION=2.10.4 \
-    HARFBUZZ_VERSION=2.6.7 \
+    GLIB_VERSION=2.73.2 \
+    GLIB_MINOR_VERSION=2.73 \
+    FREETYPE_VERSION=2.12.1 \
+    HARFBUZZ_VERSION=5.0.1 \
     PIXMAN_VERSION=0.40.0 \
     CAIRO_VERSION=1.17.4 \
-    LIBRSVG_VERSION=2.51.2 \
-    LIBRSVG_MINOR_VERSION=2.51 \
-    GDK_PIXBUF_VERSION=2.42.2 \
+    LIBRSVG_VERSION=2.54.4 \
+    LIBRSVG_MINOR_VERSION=2.54 \
+    GDK_PIXBUF_VERSION=2.42.8 \
     GDK_PIXBUF_MINOR_VERSION=2.42 \
     LIBFFI_VERSION=3.3 \
     BZIP2_VERSION=1.0.6 \
-    UTIL_LINUX_VERSION=2.33 \
+    UTIL_LINUX_VERSION=2.38 \
     LIBPNG_VERSION=1.6.37 \
-    OPENJP2_VERSION=2.3.1 \
-    LIBTIFF_VERSION=4.1.0 \
+    OPENJP2_VERSION=2.5.0 \
+    LIBTIFF_VERSION=4.4.0 \
     LIBCROCO_VERSION=0.6.13 \
     LIBCROCO_MINOR_VERSION=0.6 \
     FONTCONFIG_VERSION=2.13.0 \
-    LIBJPEG_VERSION=9c \
-    PANGO_VERSION=1.48.4 \
-    PANGO_MINOR_VERSION=1.48 \
+    LIBJPEG_VERSION=9e \
+    PANGO_VERSION=1.50.8 \
+    PANGO_MINOR_VERSION=1.50 \
     LIBXML2_VERSION=2.9.9 \
     ZLIB_VERSION=1.2.11
 
@@ -76,7 +76,7 @@ ENV CMAKE_SOURCE=cmake-${CMAKE_VERSION}-Linux-x86_64.sh \
 
 RUN curl -LOf https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/${CMAKE_SOURCE} && \
     curl -LOf https://download.savannah.gnu.org/releases/freetype/${FREETYPE_SOURCE} && \
-    curl -LOf https://www.freedesktop.org/software/harfbuzz/release/${HARFBUZZ_SOURCE} && \
+    curl -LOf https://github.com/harfbuzz/harfbuzz/releases/download/${HARFBUZZ_VERSION}/${HARFBUZZ_SOURCE} && \
     curl -LOf https://ftp.gnome.org/pub/gnome/sources/glib/${GLIB_MINOR_VERSION}/${GLIB_SOURCE} && \
     curl -LOf https://www.cairographics.org/releases/${PIXMAN_SOURCE} && \
     curl -LOf https://www.cairographics.org/snapshots/${CAIRO_SOURCE} && \
@@ -93,8 +93,8 @@ RUN curl -LOf https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSIO
     curl -LOf http://ijg.org/files/${LIBJPEG_SOURCE} && \
     curl -LOf https://ftp.gnome.org/pub/GNOME/sources/pango/${PANGO_MINOR_VERSION}/${PANGO_SOURCE} && \
     curl -LOf ftp://xmlsoft.org/libxml2/${LIBXML2_SOURCE} && \
-    curl -LOf https://zlib.net/${ZLIB_SOURCE} && \
-    for i in $PWD/*.tar.*; do tar xf $i && rm $i; done
+    curl -LOf http://prdownloads.sourceforge.net/libpng/${ZLIB_SOURCE}
+RUN for i in $PWD/*.tar.*; do tar xf $i && rm $i; done
 
 ENV LD_LIBRARY_PATH="${CACHE_DIR}/lib64:${CACHE_DIR}/lib"
 
@@ -149,8 +149,13 @@ RUN cd tiff-* && \
 	make && \
 	make install
 
+RUN cd jpeg-* && \
+    ./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath && \
+    make && \
+    make install
+
 RUN cd glib-* && \
-    meson --prefix ${CACHE_DIR} _build -Dman=false -Dinternal_pcre=true -Dselinux=disabled \
+    meson --prefix ${CACHE_DIR} _build -Dman=false -Dselinux=disabled \
         -Ddefault_library=static -Dnls=disabled -Dlibmount=disabled -Dxattr=false && \
     ninja -v -C _build && \
     ninja -C _build install
@@ -160,7 +165,7 @@ ENV GDK_PIXBUF_MODULEDIR=${TARGET_DIR}/lib/gdk-pixbuf-loaders \
 
 # builtin_loaders: eh
 RUN cd gdk-pixbuf-* && \
-    meson --prefix ${CACHE_DIR} _build -Dgir=false -Dx11=false -Ddefault_library=static \
+    meson --prefix ${CACHE_DIR} _build -Dintrospection=disabled -Ddefault_library=static \
         -Drelocatable=true -Dgio_sniffing=false -Dbuiltin_loaders=jpeg,png -Dinstalled_tests=false && \
     ninja -C _build && \
     ninja -C _build install
@@ -178,7 +183,7 @@ RUN cd libxml2-* && \
 	make && \
 	make install
 
-ENV FREETYPE_WITHOUT_HB_DIR=${BUILD_DIR}/freetype-${FREETYPE_VERSION}-without-harfbuzz
+ENV FREETYPE_WITHOUT_HB_DIR=${BUILD_DIR}/freetype_without_harfbuzz-${FREETYPE_VERSION}
 
 RUN cp -r freetype-${FREETYPE_VERSION} /tmp/ && \
 	rm -rf ${FREETYPE_WITHOUT_HB_DIR} && \
@@ -197,10 +202,10 @@ RUN	cd fontconfig-* && \
 	make install
 
 RUN cd harfbuzz-* && \
-    ./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
-        --with-freetype --with-glib --with-fontconfig && \
-	make && \
-	make install
+    meson --prefix ${CACHE_DIR} build -Dintrospection=disabled -Ddefault_library=static \
+        -Dfreetype=enabled -Dglib=enabled -Dgobject=disabled -Dtests=disabled -Ddocs=disabled && \
+    meson compile -C build && \
+    ninja -C build install
 
 RUN cd freetype-* && \
     ./configure --prefix ${CACHE_DIR} --disable-shared --enable-static --disable-dependency-tracking --disable-rpath \
@@ -290,7 +295,7 @@ RUN rm -r ${TARGET_DIR}/share
 
 ### LibRSVG
 
-FROM amazonlinux:2.0.20200406.0-with-sources AS librsvg
+FROM amazonlinux:2-with-sources AS librsvg
 
 COPY --from=builder /opt /opt
 COPY cloud.svg /tmp/
@@ -323,7 +328,7 @@ RUN yum install -y zip
 
 RUN cd /opt && zip -r /librsvg-layer.zip .
 
-RUN echo "cp librsvg-layer.zip /dist/librsvg-layer.zip" > /entrypoint.sh && \
+RUN echo "cp librsvg-layer.zip /dist/librsvg-layer.$(uname -m).zip" > /entrypoint.sh && \
   chmod +x entrypoint.sh
 
 ENTRYPOINT "/entrypoint.sh"
