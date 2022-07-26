@@ -3,7 +3,8 @@
 ![Releases](https://img.shields.io/github/v/release/bubblydoo/librsvg-lambda-layer.svg)
 ![Build Docker Layer](https://github.com/bubblydoo/librsvg-lambda-layer/workflows/Build%20Docker%20Layer/badge.svg)
 
-Scripts to statically compile LibRSVG for AWS Lambda instances powered by Amazon Linux 2.x.
+Dockerfile to statically compile LibRSVG for AWS Lambda instances powered by Amazon Linux 2.x.
+Pre-built layers are available for both x86_64 and arm64 Lambdas.
 
 ## Usage
 
@@ -11,7 +12,25 @@ The `rsvg` binary will be in `/opt/bin/rsvg-convert` after linking the layer to 
 
 ## Download
 
-The Lambda Layer ZIP can be found in [Releases](https://github.com/bubblydoo/librsvg-lambda-layer/releases).
+The Lambda Layer ZIPs can be found in [Releases](https://github.com/bubblydoo/librsvg-lambda-layer/releases).
+
+In order to use it, download one of the zips, then deploy them as follows:
+
+```bash
+aws lambda publish-layer-version \
+  --layer-name rsvg \
+  --description "Librsvg layer for x86_64" \
+  --license-info "MIT License" \
+  --zip-file fileb://librsvg-lambda-layer.x86_64.zip \
+  --compatible-architectures x86_64
+
+aws lambda publish-layer-version \
+  --layer-name rsvg-arm64 \
+  --description "Librsvg layer for arm64" \
+  --license-info "MIT License" \
+  --zip-file fileb://librsvg-lambda-layer.aarch64.zip \
+  --compatible-architectures arm64
+```
 
 ## Prerequisites
 
@@ -59,7 +78,6 @@ aws lambda publish-layer-version \
   --description "Librsvg layer for x86_64" \
   --license-info "MIT License" \
   --zip-file fileb://dist/librsvg-layer.x86_64.zip \
-  --compatible-runtimes nodejs12.x nodejs14.x nodejs16.x \
   --compatible-architectures x86_64
 
 aws lambda publish-layer-version \
@@ -67,7 +85,6 @@ aws lambda publish-layer-version \
   --description "Librsvg layer for arm64" \
   --license-info "MIT License" \
   --zip-file fileb://dist/librsvg-layer.aarch64.zip \
-  --compatible-runtimes nodejs12.x nodejs14.x nodejs16.x \
   --compatible-architectures arm64
 ```
 
