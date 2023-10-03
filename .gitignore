@@ -7,3 +7,4 @@ tmp
 *.png
 *.svg
 !cloud.svg
+.DS_Store
